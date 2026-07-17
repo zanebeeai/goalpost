@@ -1,0 +1,29 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# tests and builds
+/coverage
+/playwright-report
+/test-results
+/.next
+/out
+
+# local environments
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# tooling
+.DS_Store
+*.pem
+*.tsbuildinfo
+.vercel
+.sentryclirc
+supabase/.branches
+supabase/.temp
+
+# local backup output
+/backups
