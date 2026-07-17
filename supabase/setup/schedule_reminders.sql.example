@@ -1,0 +1,19 @@
+-- Run after deploying process-reminders and setting CRON_SECRET in both Vault and
+-- Edge Function secrets. Substitute the project URL and generated secret.
+select vault.create_secret('https://PROJECT_REF.supabase.co', 'goalpost_project_url');
+select vault.create_secret('REPLACE_WITH_LONG_RANDOM_SECRET', 'goalpost_cron_secret');
+
+select cron.schedule(
+  'goalpost-process-reminders',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'goalpost_project_url') || '/functions/v1/process-reminders',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'goalpost_cron_secret')
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
