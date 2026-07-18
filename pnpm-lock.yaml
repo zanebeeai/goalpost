@@ -114,7 +114,7 @@ importers:
         specifier: ^0.7.2
         version: 0.7.4(prettier@3.9.5)
       supabase:
-        specifier: ^2.72.7
+        specifier: 2.109.1
         version: 2.109.1
       tailwindcss:
         specifier: ^4.3.3

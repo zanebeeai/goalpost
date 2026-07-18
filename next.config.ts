@@ -1,9 +1,13 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+const isDevelopment = process.env.NODE_ENV === "development";
+const localSupabaseHttp = " http://127.0.0.1:54321 http://localhost:54321";
+const localSupabaseSockets = " ws://127.0.0.1:54321 ws://localhost:54321";
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  allowedDevOrigins: ["127.0.0.1"],
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   experimental: {
     serverActions: {
       bodySizeLimit: "26mb",
@@ -34,17 +38,17 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com`,
+              `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://challenges.cloudflare.com`,
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' blob: data: https://*.supabase.co",
+              `img-src 'self' blob: data: https://*.supabase.co${isDevelopment ? localSupabaseHttp : ""}`,
               "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io${isDevelopment ? `${localSupabaseHttp}${localSupabaseSockets}` : ""}`,
               "frame-src https://challenges.cloudflare.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'none'",
-              "upgrade-insecure-requests",
+              ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
             ].join("; "),
           },
         ],

@@ -8,34 +8,44 @@ This guide covers a complete local setup, the available automated and manual tes
 
 Install:
 
-- Node.js 22 or newer
-- Corepack and pnpm 9.15.4
+- [mise](https://mise.jdx.dev/) 2026.7.0 or newer
 - Docker Desktop with Linux containers running
 - Git
 
-The Supabase CLI is already a development dependency, so a separate global installation is not required.
+The committed `mise.toml` installs exact Node.js and pnpm versions. The Supabase CLI remains a repository development dependency, so it does not require a global installation.
 
 ### First-time setup
 
-From the repository root in PowerShell:
+Install mise on macOS:
 
-```powershell
-corepack enable
-pnpm install --frozen-lockfile
-pnpm db:start
-pnpm exec supabase status
-Copy-Item .env.example .env.local
+```sh
+brew install mise
 ```
 
-`pnpm db:start` starts the local Postgres, Auth, Storage, Realtime, Studio, Mailpit, and Edge Runtime containers and applies the migrations in `supabase/migrations`.
+On Windows, use Scoop (recommended) or winget:
 
-Use the output from `pnpm exec supabase status` to configure `.env.local`:
+```powershell
+scoop install mise
+# Or: winget install jdx.mise
+```
+
+From the repository root on either platform:
+
+```sh
+mise trust
+mise install
+mise run setup
+```
+
+The setup task installs the frozen pnpm dependencies, starts local Postgres, Auth, Storage, Realtime, Studio, Mailpit, and Edge Runtime containers, applies migrations, and configures `.env.local`.
+
+`env:local` securely reads the local stack's status and creates or updates `.env.local` with:
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<PUBLISHABLE_KEY from supabase status>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<local publishable key>
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
-SUPABASE_SECRET_KEY=<SECRET_KEY from supabase status>
+SUPABASE_SECRET_KEY=<local secret key>
 
 # These may remain blank locally.
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=
@@ -49,12 +59,14 @@ SENTRY_ORG=
 SENTRY_PROJECT=
 ```
 
+The generated file is ignored by Git. Existing optional integration settings are preserved when `env:local` is run again, and secret values are not printed to the terminal.
+
 The Supabase URL must be the API root, `http://127.0.0.1:54321`. Do not use the Storage S3 URL ending in `/storage/v1/s3`.
 
 Start the web application:
 
-```powershell
-pnpm dev
+```sh
+mise run dev
 ```
 
 Use these local endpoints:
@@ -66,7 +78,7 @@ Use these local endpoints:
 | Mailpit         | <http://127.0.0.1:54324> |
 | Supabase API    | <http://127.0.0.1:54321> |
 
-Use `localhost:3000` consistently for the app. Restart `pnpm dev` after changing `.env.local`.
+Use `localhost:3000` consistently for the app. Restart `mise run dev` after changing `.env.local`.
 
 ### Create a local account
 
@@ -79,15 +91,15 @@ Google OAuth is disabled locally by default. Email/password signup exercises the
 
 ### Reset or stop the local stack
 
-```powershell
+```sh
 # Reapply migrations and erase all local application data.
-pnpm db:reset
+mise exec -- pnpm db:reset
 
 # Stop the containers while retaining their Docker volumes.
-pnpm db:stop
+mise exec -- pnpm db:stop
 ```
 
-Run `pnpm db:start` to resume. The seed intentionally creates no users; create accounts through the app so password hashing, confirmation, and onboarding are tested normally.
+Run `mise exec -- pnpm db:start` to resume. The seed intentionally creates no users; create accounts through the app so password hashing, confirmation, and onboarding are tested normally.
 
 ## Automated tests
 
@@ -95,12 +107,8 @@ Run `pnpm db:start` to resume. The seed intentionally creates no users; create a
 
 Run the same checks used by CI:
 
-```powershell
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test:coverage
-pnpm build
+```sh
+mise run check
 ```
 
 The unit suite covers rich-text validation, file validation, and shared utilities. A production build also catches Server/Client Component and route compilation problems that type checking alone may miss.
@@ -109,26 +117,26 @@ The unit suite covers rich-text validation, file validation, and shared utilitie
 
 With local Supabase running:
 
-```powershell
-pnpm db:test
+```sh
+mise exec -- pnpm db:test
 ```
 
 This runs the pgTAP database and RLS suites in `supabase/tests`. Run it after every migration or authorization-policy change.
 
 To regenerate TypeScript database types after a schema change:
 
-```powershell
-pnpm db:types
-pnpm typecheck
+```sh
+mise exec -- pnpm db:types
+mise exec -- pnpm typecheck
 ```
 
 ### Public browser tests
 
 Install the Playwright browser once, then run the public desktop and mobile tests:
 
-```powershell
-pnpm exec playwright install chromium
-pnpm test:e2e
+```sh
+mise exec -- pnpm exec playwright install chromium
+mise exec -- pnpm test:e2e
 ```
 
 Playwright starts the Next.js development server automatically, or reuses one already listening on port 3000. The authenticated journey is skipped unless explicitly enabled.
@@ -137,14 +145,24 @@ Playwright starts the Next.js development server automatically, or reuses one al
 
 The authenticated test creates and confirms a disposable user through the Supabase admin API, completes onboarding, captures an idea, promotes it to a public goal, and deletes the test user afterward.
 
-Get the local keys from `pnpm exec supabase status`, then run:
+Get the local keys from `mise exec -- pnpm exec supabase status`, then run:
 
 ```powershell
 $env:E2E_AUTHENTICATED = "1"
 $env:NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321"
 $env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "<PUBLISHABLE_KEY>"
 $env:SUPABASE_SECRET_KEY = "<SECRET_KEY>"
-pnpm test:e2e --project=chromium
+mise exec -- pnpm test:e2e --project=chromium
+```
+
+On macOS/Linux, provide the same variables for the command:
+
+```sh
+E2E_AUTHENTICATED=1 \
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY='<PUBLISHABLE_KEY>' \
+SUPABASE_SECRET_KEY='<SECRET_KEY>' \
+mise exec -- pnpm test:e2e --project=chromium
 ```
 
 Only run authenticated E2E tests against a disposable local or staging Supabase project. Never point them at production.
@@ -166,7 +184,7 @@ RESEND_FROM=Goalpost <reminders@example.com>
 In one terminal:
 
 ```powershell
-pnpm exec supabase functions serve process-reminders --no-verify-jwt --env-file supabase/functions/.env.local
+mise exec -- pnpm exec supabase functions serve process-reminders --no-verify-jwt --env-file supabase/functions/.env.local
 ```
 
 Create a due reminder in Goalpost, then invoke the function from another terminal:
@@ -213,10 +231,10 @@ Log out and back in after changing app metadata. The moderation queue is at `/ap
 
 - **`Unexpected token '<'` or XML returned during signup:** `NEXT_PUBLIC_SUPABASE_URL` is probably set to the Storage S3 endpoint. Change it to `http://127.0.0.1:54321` and restart Next.js.
 - **No verification email in the real inbox:** local emails are captured by Mailpit at <http://127.0.0.1:54324>.
-- **Supabase does not start:** confirm Docker Desktop is running, then inspect `pnpm exec supabase status` and Docker's container logs.
+- **Supabase does not start:** confirm Docker Desktop is running, then inspect `mise exec -- pnpm exec supabase status` and Docker's container logs.
 - **Confirmation returns to the wrong host:** use <http://localhost:3000> and ensure `NEXT_PUBLIC_SITE_URL` matches it.
-- **Environment changes have no effect:** stop and restart `pnpm dev`; Next.js reads environment variables when the server starts.
-- **Local schema is stale:** run `pnpm db:reset`. This deletes local data.
+- **Environment changes have no effect:** stop and restart `mise run dev`; Next.js reads environment variables when the server starts.
+- **Local schema is stale:** run `mise exec -- pnpm db:reset`. This deletes local data.
 
 ## Deploy Goalpost online
 
@@ -243,17 +261,17 @@ For each environment:
 2. Link the CLI and apply the versioned migrations:
 
    ```powershell
-   pnpm exec supabase login
-   pnpm exec supabase link --project-ref <PROJECT_REF>
-   pnpm exec supabase db push
+   mise exec -- pnpm exec supabase login
+   mise exec -- pnpm exec supabase link --project-ref <PROJECT_REF>
+   mise exec -- pnpm exec supabase db push
    ```
 
 3. Confirm the private `goalpost-media` bucket, RLS policies, database functions, and Realtime configuration created by the migration.
 4. Generate hosted database types and review the resulting diff:
 
    ```powershell
-   pnpm exec supabase gen types typescript --linked > src/types/database.generated.ts
-   pnpm typecheck
+   mise exec -- pnpm exec supabase gen types typescript --linked > src/types/database.generated.ts
+   mise exec -- pnpm typecheck
    ```
 
 Migrations are forward-only after deployment. Fix an applied migration with a new migration rather than editing its history.
@@ -302,14 +320,14 @@ Add the final domain to Vercel, update DNS, and redeploy after changing environm
 Create a long random cron secret. Deploy the function without Supabase gateway JWT verification because the function authenticates the cron request with that secret:
 
 ```powershell
-pnpm exec supabase secrets set `
+mise exec -- pnpm exec supabase secrets set `
   CRON_SECRET=<LONG_RANDOM_SECRET> `
   RESEND_API_KEY=<RESEND_API_KEY> `
   "RESEND_FROM=Goalpost <reminders@YOUR_DOMAIN>" `
   SITE_URL=https://YOUR_DOMAIN `
   --project-ref <PROJECT_REF>
 
-pnpm exec supabase functions deploy process-reminders `
+mise exec -- pnpm exec supabase functions deploy process-reminders `
   --project-ref <PROJECT_REF> `
   --no-verify-jwt
 ```

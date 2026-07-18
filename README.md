@@ -18,33 +18,43 @@ This repository contains the complete deployable beta:
 
 Requirements:
 
-- Node.js 22+
-- pnpm 9.15.4 (Corepack can provide it)
+- [mise](https://mise.jdx.dev/) 2026.7.0 or newer
 - Docker Desktop for the local Supabase stack
-- Supabase CLI, installed by this repository
+- Git
 
-Install and start:
+Install mise with Homebrew on macOS:
 
-```powershell
-corepack pnpm install
-corepack pnpm db:start
-Copy-Item .env.example .env.local
-corepack pnpm dev
+```sh
+brew install mise
 ```
 
-After `supabase start`, copy the local API URL and publishable/anon key into `.env.local`. The local confirmation email appears in Inbucket at `http://127.0.0.1:54324`.
+On Windows, install mise with Scoop (recommended) or winget:
+
+```powershell
+scoop install mise
+# Or: winget install jdx.mise
+```
+
+Then, on either platform, install the pinned tools and configure Goalpost:
+
+```sh
+mise trust
+mise install
+mise run setup
+mise run dev
+```
+
+The committed `mise.toml` pins Node.js and pnpm for every developer and CI. The `setup` task installs dependencies, starts Supabase, and runs `env:local`. That command writes the current developer's local Supabase values to an ignored `.env.local` without printing credentials and preserves existing optional settings. Local confirmation email appears at `http://127.0.0.1:54324`.
 
 Useful commands:
 
-```powershell
-corepack pnpm typecheck
-corepack pnpm lint
-corepack pnpm test
-corepack pnpm build
-corepack pnpm db:reset
-corepack pnpm db:test
-corepack pnpm db:types
-corepack pnpm test:e2e
+```sh
+mise run check
+mise exec -- pnpm test
+mise exec -- pnpm db:reset
+mise exec -- pnpm db:test
+mise exec -- pnpm db:types
+mise exec -- pnpm test:e2e
 ```
 
 The app can build without environment values so its public marketing and legal pages remain testable in CI. Authenticated and data-backed routes require Supabase configuration.
