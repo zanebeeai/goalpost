@@ -240,6 +240,34 @@ Log out and back in after changing app metadata. The moderation queue is at `/ap
 
 Use separate staging and production environments. Validate migrations, authentication, reminders, uploads, and backups in staging before production.
 
+### Current production snapshot
+
+Last verified: July 19, 2026.
+
+| Component           | Production value or state                                         |
+| ------------------- | ----------------------------------------------------------------- |
+| Canonical site      | `https://goalpost.click`                                          |
+| `www` handling      | `https://www.goalpost.click` redirects to the canonical site      |
+| Vercel project      | `zanzilla22s-projects/goalpost`                                   |
+| Supabase project    | `hpnpfvdvqhzqnhvokbzf`                                            |
+| Deployed revision   | `ac32ba3`                                                         |
+| Database            | Versioned migration applied; CI database checks passing           |
+| Reminders           | `process-reminders` deployed and the minute cron returns HTTP 200 |
+| Authentication URLs | Production Site URL and `/auth/callback` redirect configured      |
+
+The production smoke test has passed for the landing and signup pages, login, onboarding, private Inbox creation, idea capture, atomic idea-to-goal promotion, anonymous public goal access, and disposable-account cleanup.
+
+The following credential-dependent integrations are not yet production-ready: custom SMTP/Resend delivery, Google OAuth, Turnstile, Sentry, and encrypted R2 backups. Do not treat a successful pre-confirmed-user smoke test as proof that confirmation email delivery works.
+
+Production DNS currently uses:
+
+```text
+A      @      216.198.79.1
+CNAME  www    eabfed445268c85e.vercel-dns-017.com
+```
+
+Secrets remain in ignored local environment files and provider secret stores. Never commit `.env`, `.env.local`, Supabase secret keys, cron secrets, or provider credentials while synchronizing production state.
+
 ### Required services and accounts
 
 - A Supabase project for staging and another for production
