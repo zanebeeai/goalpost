@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { requireSupabase } from "./support";
+import { googleEnabledOnStack, requireSupabase } from "./support";
 
 async function robotsMeta(page: Page) {
   return page.locator('meta[name="robots"]').getAttribute("content");
@@ -45,15 +45,31 @@ test("login page is generic and not indexed", async ({ page }) => {
   await page.goto("/auth/login");
   await expect(page).toHaveTitle("Log in · Goalpost");
   await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Continue with Google" }),
-  ).toBeVisible();
   expect(await robotsMeta(page)).toBe("noindex, nofollow");
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
     "content",
     "Goalpost",
   );
 });
+
+// The local stack (supabase/config.toml) and CI have Google turned off, so
+// the button must not lead to Supabase's raw "provider is not enabled" page.
+for (const path of ["/auth/login", "/auth/signup"]) {
+  test(`${path} offers Google only when the provider is on`, async ({
+    page,
+  }) => {
+    const enabled = await googleEnabledOnStack();
+    await page.goto(path);
+    await expect(page.getByLabel("Email")).toBeVisible();
+    const google = page.getByRole("button", { name: "Continue with Google" });
+    if (enabled) {
+      await expect(google).toBeVisible();
+    } else {
+      await expect(google).toHaveCount(0);
+      await expect(page.getByText("or", { exact: true })).toHaveCount(0);
+    }
+  });
+}
 
 test("robots.txt keeps private routes out", async ({ request }) => {
   const body = await (await request.get("/robots.txt")).text();

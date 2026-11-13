@@ -37,7 +37,11 @@ export async function GET(request: NextRequest) {
   }
 
   const failure = new URL("/auth/login", origin);
-  failure.searchParams.set("error", "confirm");
-  if (type !== "recovery") failure.searchParams.set("next", next);
+  if (type === "recovery") {
+    failure.searchParams.set("error", "reset");
+  } else {
+    failure.searchParams.set("error", "confirm");
+    failure.searchParams.set("next", next);
+  }
   return NextResponse.redirect(failure);
 }

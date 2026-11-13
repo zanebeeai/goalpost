@@ -4,6 +4,7 @@ import { AuthLink, AuthShell } from "@/components/auth-shell";
 import { GoogleButton, OrDivider } from "@/components/google-button";
 import { SignupCard } from "@/components/signup-card";
 import { getViewer } from "@/lib/auth";
+import { isGoogleAuthEnabled } from "@/lib/auth-providers";
 import { safeRedirectPath } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Sign up" };
@@ -18,6 +19,7 @@ export default async function SignupPage({
     typeof params.next === "string" ? params.next : null,
   );
   if (await getViewer()) redirect(next);
+  const google = await isGoogleAuthEnabled();
   const loginHref =
     next === "/app"
       ? "/auth/login"
@@ -42,10 +44,12 @@ export default async function SignupPage({
         }
         next={next}
         google={
-          <>
-            <GoogleButton next={next} />
-            <OrDivider />
-          </>
+          google ? (
+            <>
+              <GoogleButton next={next} />
+              <OrDivider />
+            </>
+          ) : null
         }
       />
     </AuthShell>

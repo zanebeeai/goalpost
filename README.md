@@ -18,7 +18,7 @@ mise run dev                 # http://localhost:3000
 
 - Confirmation and reset emails land in the local mail catcher at http://127.0.0.1:54324.
 - Supabase Studio is at http://127.0.0.1:54323.
-- Google sign-in is turned off locally. Use email and password.
+- Google is turned off in `supabase/config.toml`, so the login and signup pages hide **Continue with Google**. Use email and password. The app shows the button only when the Supabase project reports the Google provider as enabled (checked every 5 minutes).
 - To try the nudge job, set `CRON_SECRET` in `.env.local` and run
   `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/nudge`.
   Without `RESEND_API_KEY` and `RESEND_FROM` it returns `{ "skipped": ... }` and sends nothing.
@@ -80,7 +80,7 @@ Below, `YOUR_DOMAIN` is the app's domain (for example `goalpost.example.com`) an
    2. Under Authorized JavaScript origins, add `https://YOUR_DOMAIN`.
    3. Under Authorized redirect URIs, add the callback URL shown on Supabase's Google provider page. It looks like `https://<ref>.supabase.co/auth/v1/callback`.
    4. Under **Data Access**, add the `openid`, `userinfo.email` and `userinfo.profile` scopes. With only these scopes, nobody needs to be added as a test user.
-   5. Paste the client ID and secret into Supabase under **Authentication > Sign In / Providers > Google**, then enable the provider.
+   5. Paste the client ID and secret into Supabase under **Authentication > Sign In / Providers > Google**, then enable the provider. There is no env var for this: once the provider is on, **Continue with Google** appears on the login and signup pages within 5 minutes. Until then it stays hidden.
 
 ### 3. Resend
 
@@ -114,7 +114,7 @@ On the Hobby plan, a cron can run at most once a day. Vercel can start it any ti
 ### 6. Post-deploy checklist
 
 - [ ] Sign up with email. The confirmation comes from your Resend domain, and the link opens onboarding on `YOUR_DOMAIN`.
-- [ ] **Continue with Google** signs in and returns to the app.
+- [ ] **Continue with Google** shows on `/auth/login`, signs in and returns to the app.
 - [ ] A friend opens the invite link from Settings (`/join/...`). They land on signup, confirm their email, and end up in your space after onboarding.
 - [ ] `curl -i https://YOUR_DOMAIN/api/cron/nudge` returns 401. With `-H "Authorization: Bearer <CRON_SECRET>"` it returns 200.
 - [ ] `/api/cron/nudge` appears under **Schedules > Cron Jobs** in Vercel.

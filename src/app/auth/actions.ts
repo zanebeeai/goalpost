@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { isGoogleAuthEnabled } from "@/lib/auth-providers";
 import { getPublicEnv, isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { safeRedirectPath } from "@/lib/utils";
@@ -107,16 +108,17 @@ export async function signInAction(
 }
 
 export async function signInWithGoogleAction(formData: FormData) {
-  if (!isSupabaseConfigured()) redirect("/auth/login?error=oauth");
   const next = nextPath(formData);
+  const failure = `/auth/login?error=oauth&next=${encodeURIComponent(next)}`;
+  // A stale page can still post here after the provider was turned off;
+  // Supabase would answer with a raw JSON error page.
+  if (!(await isGoogleAuthEnabled())) redirect(failure);
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: callbackUrl(next) },
   });
-  if (error || !data.url) {
-    redirect(`/auth/login?error=oauth&next=${encodeURIComponent(next)}`);
-  }
+  if (error || !data.url) redirect(failure);
   redirect(data.url);
 }
 

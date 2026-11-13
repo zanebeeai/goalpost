@@ -23,6 +23,20 @@ export function requireSupabase(): void {
   test.skip(true, "Supabase env missing: run `mise run setup` first.");
 }
 
+/** What the app should see: Google is on only if the stack says so. */
+export async function googleEnabledOnStack(): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return false;
+  const response = await fetch(`${url}/auth/v1/settings`, {
+    headers: { apikey: key },
+  });
+  const settings = (await response.json()) as {
+    external?: { google?: boolean };
+  };
+  return settings.external?.google === true;
+}
+
 export function adminClient(): SupabaseClient {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
