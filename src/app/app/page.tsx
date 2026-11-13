@@ -4,6 +4,8 @@ import { InviteCard } from "@/components/week/invite-card";
 import { MyCard } from "@/components/week/my-card";
 import { PartnerCard } from "@/components/week/partner-card";
 import { PickTopic } from "@/components/week/pick-topic";
+import { tonightItems } from "@/components/week/tonight";
+import { TonightChecklist } from "@/components/week/tonight-checklist";
 import { WeekHeader } from "@/components/week/week-header";
 import { requireMember } from "@/lib/auth";
 import { getBoard, getUpNext } from "@/lib/data";
@@ -27,7 +29,16 @@ export default async function ThisWeekPage() {
 
   return (
     <>
-      <WeekHeader weekStart={weekStart} today={today} />
+      <WeekHeader weekStart={weekStart} today={today}>
+        <TonightChecklist
+          today={today}
+          items={tonightItems({
+            today,
+            week: mine?.week ?? null,
+            goals: mine?.goals ?? [],
+          })}
+        />
+      </WeekHeader>
       <div
         className={cn(
           "grid items-start gap-4 lg:gap-6 [&>*]:min-w-0",
@@ -61,7 +72,7 @@ export default async function ThisWeekPage() {
           ))
         )}
       </div>
-      <GoalsSection columns={columns} />
+      <GoalsSection columns={columns} today={today} />
     </>
   );
 }

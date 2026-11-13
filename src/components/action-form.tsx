@@ -30,6 +30,8 @@ type FormContextValue = {
   error: string | null;
   /** Id of the element that shows `error`, for aria-describedby. */
   errorId: string;
+  /** Which field the error is about: a field name, "all", or null for none. */
+  errorField: string | null;
 };
 
 const FormContext = createContext<FormContextValue | null>(null);
@@ -40,16 +42,18 @@ const EMPTY_CONTEXT: FormContextValue = {
   saved: false,
   error: null,
   errorId: "",
+  errorField: null,
 };
 
 export function useActionForm(): FormContextValue {
   return useContext(FormContext) ?? EMPTY_CONTEXT;
 }
 
-/** Props that tie a field to its form's error message. */
-export function useFieldErrorProps() {
+/** Props that tie a field to its form's error message, when it is about it. */
+export function useFieldErrorProps(name?: string) {
   const context = useContext(FormContext);
   if (!context?.error) return {};
+  if (context.errorField !== "all" && context.errorField !== name) return {};
   return {
     "aria-invalid": true as const,
     "aria-describedby": context.errorId,
@@ -72,6 +76,8 @@ export function ActionForm<S extends FormState>({
   onSuccess,
   validate,
   errorInline = false,
+  errorFieldFor,
+  noValidate = false,
   "aria-label": ariaLabel,
 }: {
   action: Action<S>;
@@ -82,6 +88,13 @@ export function ActionForm<S extends FormState>({
   /** Return a message to block the submit and show it as the error. */
   validate?: (formData: FormData) => string | null;
   errorInline?: boolean;
+  /**
+   * The field name an error is about, so only that field is marked invalid;
+   * null marks none (for example a limit). By default every field is marked.
+   */
+  errorFieldFor?: (error: string) => string | null;
+  /** Skip the browser's own validation bubbles; `validate` speaks instead. */
+  noValidate?: boolean;
   "aria-label"?: string;
 }) {
   const onSuccessRef = useRef(onSuccess);
@@ -131,9 +144,16 @@ export function ActionForm<S extends FormState>({
   const error =
     localError ?? (!dirty && !pending ? (state.error ?? null) : null);
   const saved = Boolean(state.ok) && !dirty && !pending && !localError;
+  const errorField = error
+    ? errorFieldFor
+      ? errorFieldFor(error)
+      : "all"
+    : null;
 
   return (
-    <FormContext.Provider value={{ pending, submitter, saved, error, errorId }}>
+    <FormContext.Provider
+      value={{ pending, submitter, saved, error, errorId, errorField }}
+    >
       <form
         ref={formRef}
         action={formAction}
@@ -144,6 +164,7 @@ export function ActionForm<S extends FormState>({
         }}
         className={className}
         aria-label={ariaLabel}
+        noValidate={noValidate}
       >
         {children}
         {errorInline ? null : <FieldError />}

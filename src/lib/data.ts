@@ -36,6 +36,8 @@ export type Goal = {
   title: string;
   /** This goal's check-in for the requested week, or null. */
   checkin: string | null;
+  /** "YYYY-MM-DD" in the space timezone. */
+  targetDate: string;
 };
 export type BoardColumn = {
   member: MemberSummary;
@@ -189,7 +191,9 @@ export async function getBoard(weekStart: string): Promise<BoardColumn[]> {
       .in("user_id", ids),
     supabase
       .from("goals")
-      .select("id, user_id, title, created_at, checkins(body, week_start)")
+      .select(
+        "id, user_id, title, target_date, created_at, checkins(body, week_start)",
+      )
       .is("finished_at", null)
       .in("user_id", ids)
       .eq("checkins.week_start", weekStart)
@@ -227,6 +231,7 @@ export async function getBoard(weekStart: string): Promise<BoardColumn[]> {
         checkin:
           goal.checkins.find((checkin) => checkin.week_start === weekStart)
             ?.body ?? null,
+        targetDate: goal.target_date,
       })),
     finishedThisWeek: finishedInWeek(finished, member.id, weekStart, timezone),
   }));

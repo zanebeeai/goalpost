@@ -3,7 +3,7 @@
 -- Dee (D) is alone in S3 and later joins S1.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(73);
+select plan(90);
 
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000a', 'tony@example.com'),
@@ -48,10 +48,10 @@ insert into public.topics (space_id, added_by, title) values
   ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Chess'),
   ('10000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000c', 'Olive topic');
 
-insert into public.goals (id, user_id, title) values
-  ('30000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Run'),
-  ('30000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000a', 'Read'),
-  ('30000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-00000000000c', 'Olive goal');
+insert into public.goals (id, user_id, title, target_date) values
+  ('30000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000a', 'Run', current_date + 28),
+  ('30000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000a', 'Read', current_date + 28),
+  ('30000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-00000000000c', 'Olive goal', current_date + 28);
 
 insert into public.checkins (goal_id, week_start, body)
 select '30000000-0000-0000-0000-000000000001'::uuid, past_week, 'Ran twice' from fixture_dates
@@ -105,7 +105,9 @@ select is(
 -- Deletes and updates on other spaces' rows silently match nothing.
 delete from public.topics where space_id = '10000000-0000-0000-0000-000000000001';
 update public.weeks set topic = 'Hacked' where id = '20000000-0000-0000-0000-000000000001';
+update public.goals set target_date = current_date + 300 where id = '30000000-0000-0000-0000-000000000001';
 reset role;
+select is((select target_date from public.goals where id = '30000000-0000-0000-0000-000000000001'), current_date + 28, 'outsider cannot change our goal dates');
 select is((select count(*) from public.topics where space_id = '10000000-0000-0000-0000-000000000001'), 1::bigint, 'outsider cannot delete our topics');
 select is((select topic from public.weeks where id = '20000000-0000-0000-0000-000000000001'), 'Rust', 'outsider cannot edit our weeks');
 
@@ -131,8 +133,14 @@ select throws_ok(
   $$insert into public.weeks (user_id, week_start, topic) select '00000000-0000-0000-0000-00000000000a', future_week + 7, 'Forged' from fixture_dates$$,
   '42501', null, 'a member cannot create a week for someone else');
 select throws_ok(
-  $$insert into public.goals (user_id, title) values ('00000000-0000-0000-0000-00000000000a', 'Forged')$$,
+  $$insert into public.goals (user_id, title, target_date) values ('00000000-0000-0000-0000-00000000000a', 'Forged', current_date + 7)$$,
   '42501', null, 'a member cannot create a goal for someone else');
+with changed as (
+  update public.goals set target_date = current_date + 300
+  where id = '30000000-0000-0000-0000-000000000001'
+  returning id
+)
+select is((select count(*) from changed), 0::bigint, 'a space mate cannot change someone else''s goal date');
 select throws_ok(
   $$insert into public.checkins (goal_id, week_start, body) select '30000000-0000-0000-0000-000000000002', past_week, 'Forged' from fixture_dates$$,
   '42501', null, 'a member cannot check in on someone else''s goal');
@@ -163,18 +171,42 @@ select lives_ok(
   $$update public.profiles set display_name = 'Tony P', email_nudges = false where id = '00000000-0000-0000-0000-00000000000a'$$,
   'a member can update their own name and nudge setting');
 select throws_ok(
-  $$insert into public.goals (title) values ('Third goal')$$,
-  'P0001', 'You can keep two goals going at once. Finish or drop one first.',
-  'the third active goal is rejected');
+  $$insert into public.goals (title) values ('No date')$$,
+  '23502', null, 'a goal needs a target date');
+-- Dates the app could not show are refused, on insert and on update.
+select throws_ok(
+  format($$insert into public.goals (title, target_date) values ('Bad date', %L)$$, bad),
+  '23514', null, 'insert refuses target_date ' || bad)
+from (values ('infinity'), ('20000-01-01'), ('0001-01-01 BC'), ('1900-01-01')) as v(bad);
+select throws_ok(
+  format($$update public.goals set target_date = %L where id = '30000000-0000-0000-0000-000000000001'$$, bad),
+  '23514', null, 'update refuses target_date ' || bad)
+from (values ('infinity'), ('20000-01-01'), ('0001-01-01 BC'), ('1900-01-01')) as v(bad);
+select lives_ok(
+  $$update public.goals set target_date = current_date + 60 where id = '30000000-0000-0000-0000-000000000001'$$,
+  'the owner can change a goal''s target date');
+select is(
+  (select target_date from public.goals where id = '30000000-0000-0000-0000-000000000001'),
+  current_date + 60, 'the new target date is stored');
+select lives_ok(
+  $$insert into public.goals (title, target_date) values ('Third goal', current_date + 28)$$,
+  'a third active goal is allowed');
+select throws_ok(
+  $$insert into public.goals (title, target_date) values ('Fourth goal', current_date + 28)$$,
+  'P0001', 'You can keep three goals going at once. Finish or drop one first.',
+  'the fourth active goal is rejected');
 select lives_ok(
   $$update public.goals set finished_at = now() where id = '30000000-0000-0000-0000-000000000002'$$,
   'finishing a goal frees a slot');
 select lives_ok(
-  $$insert into public.goals (title) values ('Third goal')$$,
+  $$insert into public.goals (title, target_date) values ('Fourth goal', current_date + 28)$$,
   'a new goal fits after finishing one');
 select throws_ok(
   $$update public.goals set finished_at = null where id = '30000000-0000-0000-0000-000000000002'$$,
   'P0001', null, 'reopening a goal cannot exceed the limit');
+select lives_ok(
+  $$update public.goals set target_date = current_date + 90 where id = '30000000-0000-0000-0000-000000000001'$$,
+  'a goal at the limit can still change its date');
 select throws_ok(
   $$select public.enter_space('Tony again')$$,
   '23505', 'You are already set up.', 'enter_space refuses an existing member');
@@ -189,6 +221,18 @@ select throws_ok(
   $$select public.set_space_timezone('pacific/kiritimati')$$,
   '22023', null,
   'set_space_timezone rejects non-canonical spellings instead of storing UTC');
+
+-- Tony is at the limit now. Forged writes from others hit RLS, never the
+-- limit message, so they learn nothing about how many goals Tony has.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000c","role":"authenticated"}', true);
+select throws_ok(
+  $$insert into public.goals (user_id, title, target_date) values ('00000000-0000-0000-0000-00000000000a', 'Forged', current_date + 7)$$,
+  '42501', null, 'an outsider''s forged goal fails on RLS, not the limit');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+select throws_ok(
+  $$insert into public.goals (user_id, title, target_date) values ('00000000-0000-0000-0000-00000000000a', 'Forged', current_date + 7)$$,
+  '42501', null, 'a space mate''s forged goal fails on RLS, not the limit');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-00000000000a","role":"authenticated"}', true);
 
 -- ---------------------------------------------------------------------------
 -- The reveal instant is frozen when the week is created

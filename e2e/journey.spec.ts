@@ -116,9 +116,9 @@ test("two friends share a week", async ({ page, browser }, testInfo) => {
 
   await test.step("A adds a goal and checks in", async () => {
     await page.getByRole("button", { name: "Add a goal" }).click();
-    const add = formWith(page, "Something longer-running?");
-    await add.getByLabel("Something longer-running?").fill(goalA);
-    await add.getByRole("button", { name: "Add" }).click();
+    const add = formWith(page, "What do you want to get done?");
+    await add.getByLabel("What do you want to get done?").fill(goalA);
+    await add.getByRole("button", { name: "Add goal" }).click();
     await expect(page.getByText(goalA, { exact: true })).toBeVisible();
 
     const checkin = formWith(page, "One line: how did it go this week?");

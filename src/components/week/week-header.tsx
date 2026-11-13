@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   addDays,
   daysUntilInterview,
@@ -26,9 +27,12 @@ function phaseLine(today: string): string {
 export function WeekHeader({
   weekStart,
   today,
+  children,
 }: {
   weekStart: string;
   today: string;
+  /** Shown under the phase line, such as Friday's checklist. */
+  children?: ReactNode;
 }) {
   const days = LETTERS.map((letter, index) => {
     const date = addDays(weekStart, index);
@@ -43,6 +47,7 @@ export function WeekHeader({
       <h1 className="mt-1 font-display text-[1.75rem] leading-tight font-semibold tracking-tight text-balance text-forest-900 sm:text-4xl">
         {phaseLine(today)}
       </h1>
+      {children}
       <ol aria-hidden className="mt-5 grid max-w-sm grid-cols-7 gap-1">
         {days.map(({ letter, date, day }, index) => {
           const isToday = date === today;

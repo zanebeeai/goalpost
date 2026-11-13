@@ -8,7 +8,7 @@ const fieldBase =
   "w-full min-w-0 rounded-xl border border-line bg-white/70 px-3.5 text-base text-ink placeholder:text-muted/70 transition-colors outline-none hover:border-moss-400 focus:border-forest-500 focus:bg-white focus:ring-3 focus:ring-moss-100 disabled:opacity-60 aria-invalid:border-clay-ink";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
-  const errorProps = useFieldErrorProps();
+  const errorProps = useFieldErrorProps(props.name);
   return (
     <input
       className={cn(fieldBase, "h-12", className)}
@@ -19,7 +19,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
 }
 
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
-  const errorProps = useFieldErrorProps();
+  const errorProps = useFieldErrorProps(props.name);
   return (
     <textarea
       className={cn(

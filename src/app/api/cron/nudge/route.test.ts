@@ -3,6 +3,16 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const updates: Array<{ id: string; last_nudged_on: string }> = [];
+const goalQueries: Array<Array<[string, ...unknown[]]>> = [];
+
+const goals = [
+  {
+    user_id: "u2",
+    title: "Run a 10k",
+    target_date: "2026-11-11",
+    checkins: [],
+  },
+];
 
 const profiles = [
   {
@@ -39,6 +49,23 @@ vi.mock("@/lib/supabase/admin", () => ({
       },
     },
     from: (table: string) => {
+      if (table === "goals") {
+        const calls: Array<[string, ...unknown[]]> = [];
+        goalQueries.push(calls);
+        const query = {
+          select: (...args: unknown[]) => (
+            calls.push(["select", ...args]),
+            query
+          ),
+          is: (...args: unknown[]) => (calls.push(["is", ...args]), query),
+          in: (...args: unknown[]) => (calls.push(["in", ...args]), query),
+          order: async (...args: unknown[]) => {
+            calls.push(["order", ...args]);
+            return { data: goals, error: null };
+          },
+        };
+        return query;
+      }
       if (table === "weeks") {
         return {
           select: () => ({ in: async () => ({ data: [], error: null }) }),
@@ -70,6 +97,7 @@ describe("GET /api/cron/nudge", () => {
 
   beforeEach(() => {
     updates.length = 0;
+    goalQueries.length = 0;
     fetchMock.mockClear();
     vi.stubGlobal("fetch", fetchMock);
     vi.stubEnv("CRON_SECRET", "secret");
@@ -126,6 +154,48 @@ describe("GET /api/cron/nudge", () => {
     expect(body.subject).toBe("Pick your topic");
     expect(body.text).toContain("https://goalpost.example/app");
     expect(updates).toEqual([{ id: "u1", last_nudged_on: "2026-11-08" }]);
+  });
+
+  it("adds active goals without a check-in to the Friday email", async () => {
+    vi.setSystemTime(new Date("2026-11-13T22:00:00Z"));
+    const response = await GET(request("secret"));
+    expect(await response.json()).toEqual({ sent: 2, failed: 0 });
+    const bodies = fetchMock.mock.calls.map((call) =>
+      JSON.parse((call as unknown as [string, RequestInit])[1].body as string),
+    );
+    const forSam = bodies.find((body) => body.to[0] === "sam@example.com");
+    expect(forSam.subject).toBe("Friday check-in");
+    expect(forSam.text).toContain(
+      "Check in on your goals: Run a 10k (2 days over)",
+    );
+    const forTony = bodies.find((body) => body.to[0] === "tony@example.com");
+    expect(forTony.subject).toBe("Interview night");
+    expect(forTony.text).not.toContain("Check in on your goals");
+    // Only active goals, with check-ins limited to the current week.
+    expect(goalQueries[0]).toContainEqual(["is", "finished_at", null]);
+    expect(goalQueries[0]).toContainEqual([
+      "in",
+      "checkins.week_start",
+      ["2026-11-08"],
+    ]);
+  });
+
+  it("counts a member it cannot plan as a failure and sends the rest", async () => {
+    const original = profiles[0]!.display_name;
+    profiles[0]!.display_name = null as unknown as string;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      // Friday: Sam has a goal waiting; Tony's broken row cannot be planned.
+      vi.setSystemTime(new Date("2026-11-13T22:00:00Z"));
+      const response = await GET(request("secret"));
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ sent: 1, failed: 1 });
+      expect(updates).toEqual([{ id: "u2", last_nudged_on: "2026-11-13" }]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("u1"));
+    } finally {
+      profiles[0]!.display_name = original;
+      errorSpy.mockRestore();
+    }
   });
 
   it("does not record a nudge that failed to send", async () => {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { actionContext } from "@/lib/action-context";
 import type { ActionState } from "@/lib/action-state";
 import { friendlyDbError } from "@/lib/db-errors";
+import { targetDateError } from "@/lib/goals";
 import {
   fields,
   firstIssue,
@@ -19,6 +20,16 @@ function revalidateGoals() {
 }
 
 const goalIdSchema = z.object({ goalId: idSchema });
+
+/** The trimmed date, or the sentence to show when it is not allowed. */
+function readTargetDate(
+  value: FormDataEntryValue | undefined,
+  today: string,
+): { targetDate: string } | { error: string } {
+  const targetDate = typeof value === "string" ? value.trim() : "";
+  const error = targetDateError(targetDate, today);
+  return error ? { error } : { targetDate };
+}
 
 export async function addGoalAction(
   _prev: ActionState,
@@ -35,11 +46,41 @@ export async function addGoalAction(
     .safeParse(fields(formData, "title"));
   if (!parsed.success) return { error: firstIssue(parsed.error) };
 
-  const { member, supabase } = await actionContext();
-  const { error } = await supabase
-    .from("goals")
-    .insert({ user_id: member.id, title: parsed.data.title });
+  const { member, supabase, today } = await actionContext();
+  const date = readTargetDate(formData.get("targetDate") ?? undefined, today);
+  if ("error" in date) return date;
+
+  const { error } = await supabase.from("goals").insert({
+    user_id: member.id,
+    title: parsed.data.title,
+    target_date: date.targetDate,
+  });
   if (error) return { error: friendlyDbError(error) };
+  revalidateGoals();
+  return { ok: true };
+}
+
+/** Change (or extend) the target date of one of the member's active goals. */
+export async function setGoalDateAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const parsed = goalIdSchema.safeParse(fields(formData, "goalId"));
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  const { member, supabase, today } = await actionContext();
+  const date = readTargetDate(formData.get("targetDate") ?? undefined, today);
+  if ("error" in date) return date;
+
+  const { data, error } = await supabase
+    .from("goals")
+    .update({ target_date: date.targetDate })
+    .eq("id", parsed.data.goalId)
+    .eq("user_id", member.id)
+    .is("finished_at", null)
+    .select("id");
+  if (error) return { error: friendlyDbError(error) };
+  if (data.length === 0) return { error: "That goal was not found." };
   revalidateGoals();
   return { ok: true };
 }
@@ -63,6 +104,7 @@ export async function saveCheckinAction(
     .select("id")
     .eq("id", goalId)
     .eq("user_id", member.id)
+    .is("finished_at", null)
     .maybeSingle();
   if (goal.error) return { error: friendlyDbError(goal.error) };
   if (!goal.data) return { error: "That goal was not found." };

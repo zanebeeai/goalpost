@@ -69,6 +69,11 @@
     outline: none;
   }
 
+  /* In-page links (Friday's checklist) stop short of the top edge. */
+  :target {
+    scroll-margin-top: 1.5rem;
+  }
+
   summary::-webkit-details-marker {
     display: none;
   }

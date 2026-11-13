@@ -6,6 +6,7 @@ import {
   decideNudge,
   escapeHtml,
   planNudges,
+  type NudgeGoal,
   type NudgeProfile,
 } from "./nudge";
 
@@ -34,6 +35,7 @@ describe("decideNudge", () => {
     lastNudgedOn: null,
     myTopic: null,
     mates: [{ displayName: "Sam", topic: null }],
+    pendingGoals: 0,
   };
 
   it("nudges on Sunday only when no topic is picked", () => {
@@ -52,6 +54,16 @@ describe("decideNudge", () => {
     expect(
       decideNudge({ ...base, today: "2026-11-13", mates: [], myTopic: "Go" }),
     ).toBe("interview");
+  });
+
+  it("nudges a solo member on Friday when goals wait for a check-in", () => {
+    expect(
+      decideNudge({ ...base, today: "2026-11-13", mates: [], pendingGoals: 1 }),
+    ).toBe("interview");
+    // Saturday stays quiet even with goals waiting.
+    expect(
+      decideNudge({ ...base, today: "2026-11-14", mates: [], pendingGoals: 1 }),
+    ).toBeNull();
   });
 
   it("is quiet on other days", () => {
@@ -76,6 +88,7 @@ describe("planNudges", () => {
     const [nudge, ...rest] = planNudges({
       profiles: [profile()],
       weeks: [],
+      goals: [],
       now: SUNDAY_EVENING_NY,
       siteUrl: SITE,
     });
@@ -96,6 +109,7 @@ describe("planNudges", () => {
     const nudges = planNudges({
       profiles: [profile({ timezone: "Asia/Tokyo" })],
       weeks: [],
+      goals: [],
       now: SUNDAY_EVENING_NY,
       siteUrl: SITE,
     });
@@ -106,6 +120,7 @@ describe("planNudges", () => {
     const nudges = planNudges({
       profiles: [profile()],
       weeks: [{ userId: "u1", weekStart: "2026-11-08", topic: "Rust" }],
+      goals: [],
       now: SUNDAY_EVENING_NY,
       siteUrl: SITE,
     });
@@ -116,6 +131,7 @@ describe("planNudges", () => {
     const nudges = planNudges({
       profiles: [profile()],
       weeks: [{ userId: "u1", weekStart: "2026-11-01", topic: "Rust" }],
+      goals: [],
       now: SUNDAY_EVENING_NY,
       siteUrl: SITE,
     });
@@ -138,6 +154,7 @@ describe("planNudges", () => {
         { userId: "u2", weekStart: "2026-11-08", topic: "Sourdough" },
         { userId: "u3", weekStart: "2026-11-08", topic: "Secret" },
       ],
+      goals: [],
       now: FRIDAY_EVENING_NY,
       siteUrl: SITE,
     });
@@ -163,6 +180,7 @@ describe("planNudges", () => {
         profile({ id: "u2", displayName: "Sam", emailNudges: false }),
       ],
       weeks: [{ userId: "u2", weekStart: "2026-11-08", topic: "Chess" }],
+      goals: [],
       now: FRIDAY_EVENING_NY,
       siteUrl: SITE,
     });
@@ -177,10 +195,153 @@ describe("planNudges", () => {
         profile({ id: "u2", email: null }),
       ],
       weeks: [],
+      goals: [],
       now: SUNDAY_EVENING_NY,
       siteUrl: SITE,
     });
     expect(nudges).toHaveLength(0);
+  });
+});
+
+describe("planNudges with goals", () => {
+  const goal = (overrides: Partial<NudgeGoal> = {}): NudgeGoal => ({
+    userId: "u1",
+    title: "Run a 10k",
+    targetDate: "2026-12-04",
+    checkinWeekStarts: [],
+    ...overrides,
+  });
+
+  it("lists goals without this week's check-in, with their due label", () => {
+    const [nudge] = planNudges({
+      profiles: [profile()],
+      weeks: [{ userId: "u1", weekStart: "2026-11-08", topic: "Rust" }],
+      goals: [
+        goal(),
+        goal({ title: "Ship the portfolio", targetDate: "2026-11-11" }),
+        goal({ title: "Done already", checkinWeekStarts: ["2026-11-08"] }),
+        goal({ title: "Someone else's", userId: "u2" }),
+      ],
+      now: FRIDAY_EVENING_NY,
+      siteUrl: SITE,
+    });
+    expect(nudge?.subject).toBe("Interview night");
+    expect(nudge?.text).toContain(
+      "Check in on your goals: Run a 10k (3 weeks left); Ship the portfolio (2 days over)",
+    );
+    expect(nudge?.text).not.toContain("Done already");
+    expect(nudge?.text).not.toContain("Someone else's");
+    expect(nudge?.html).toContain("<strong>Run a 10k</strong> (3 weeks left)");
+  });
+
+  it("ignores a check-in from an earlier week", () => {
+    const [nudge] = planNudges({
+      profiles: [profile()],
+      weeks: [],
+      goals: [goal({ checkinWeekStarts: ["2026-11-01"] })],
+      now: FRIDAY_EVENING_NY,
+      siteUrl: SITE,
+    });
+    expect(nudge?.text).toContain("Check in on your goals: Run a 10k");
+  });
+
+  it("sends a Friday check-in when nobody picked a topic", () => {
+    const nudges = planNudges({
+      profiles: [
+        profile(),
+        profile({ id: "u2", email: "u2@example.com", displayName: "Sam" }),
+      ],
+      weeks: [],
+      goals: [goal()],
+      now: FRIDAY_EVENING_NY,
+      siteUrl: SITE,
+    });
+    const forTony = nudges.find((n) => n.userId === "u1");
+    expect(forTony?.subject).toBe("Friday check-in");
+    expect(forTony?.kind).toBe("interview");
+    expect(forTony?.idempotencyKey).toBe("nudge-u1-2026-11-13-interview");
+    expect(forTony?.text).toContain("Check in on your goals: Run a 10k");
+    expect(forTony?.text).not.toContain("interview night");
+    // Sam has no goals and nobody picked: the email is as it was.
+    expect(nudges.find((n) => n.userId === "u2")?.subject).toBe(
+      "Interview night",
+    );
+  });
+
+  it("emails a solo member with goals and no topic", () => {
+    const nudges = planNudges({
+      profiles: [profile()],
+      weeks: [],
+      goals: [goal()],
+      now: FRIDAY_EVENING_NY,
+      siteUrl: SITE,
+    });
+    expect(nudges.map((n) => n.subject)).toEqual(["Friday check-in"]);
+  });
+
+  it("stays quiet for a solo member whose goals are all checked in", () => {
+    const nudges = planNudges({
+      profiles: [profile()],
+      weeks: [],
+      goals: [goal({ checkinWeekStarts: ["2026-11-08"] })],
+      now: FRIDAY_EVENING_NY,
+      siteUrl: SITE,
+    });
+    expect(nudges).toHaveLength(0);
+  });
+
+  it("still sends at most one email a day", () => {
+    const nudges = planNudges({
+      profiles: [profile({ lastNudgedOn: "2026-11-13" })],
+      weeks: [],
+      goals: [goal()],
+      now: FRIDAY_EVENING_NY,
+      siteUrl: SITE,
+    });
+    expect(nudges).toHaveLength(0);
+  });
+
+  it("leaves out the due label for a date it cannot read", () => {
+    const [nudge] = planNudges({
+      profiles: [profile()],
+      weeks: [],
+      goals: [goal({ targetDate: "infinity" })],
+      now: FRIDAY_EVENING_NY,
+      siteUrl: SITE,
+    });
+    expect(nudge?.text).toContain("Check in on your goals: Run a 10k\n");
+    expect(nudge?.text).not.toContain("()");
+    expect(nudge?.html).not.toContain("()");
+  });
+
+  it("skips a member whose data breaks planning and keeps going", () => {
+    const errors: string[] = [];
+    const nudges = planNudges({
+      profiles: [
+        // A broken row: the name is missing.
+        profile({ displayName: null as unknown as string }),
+        profile({ id: "u2", email: "u2@example.com", spaceId: "s2" }),
+      ],
+      weeks: [],
+      goals: [],
+      now: SUNDAY_EVENING_NY,
+      siteUrl: SITE,
+      onError: (userId) => errors.push(userId),
+    });
+    expect(errors).toEqual(["u1"]);
+    expect(nudges.map((n) => n.userId)).toEqual(["u2"]);
+  });
+
+  it("escapes goal titles in HTML", () => {
+    const email = buildInterviewEmail({
+      displayName: "Tony",
+      myTopic: null,
+      mates: [],
+      pendingGoals: [{ title: "<img src=x>", dueLabel: "Due today" }],
+      siteUrl: SITE,
+    });
+    expect(email.html).not.toContain("<img");
+    expect(email.html).toContain("&lt;img src=x&gt;");
   });
 });
 
@@ -193,6 +354,7 @@ describe("emails", () => {
       displayName: "<b>Tony</b>",
       myTopic: null,
       mates: [{ displayName: "Sam", topic: "<script>alert(1)</script>" }],
+      pendingGoals: [],
       siteUrl: SITE,
     });
     expect(email.html).not.toContain("<script>");
@@ -213,6 +375,7 @@ describe("emails", () => {
       displayName: "Tony",
       myTopic: "Rust",
       mates: [{ displayName: "Sam", topic: null }],
+      pendingGoals: [],
       siteUrl: SITE,
     });
     expect(none.text).not.toContain("Add your questions");

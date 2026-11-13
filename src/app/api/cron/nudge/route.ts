@@ -126,17 +126,34 @@ export async function GET(request: NextRequest) {
     profiles.map((profile) => profile.timezone),
     now,
   );
-  const weeksResult = await admin
-    .from("weeks")
-    .select("user_id, week_start, topic")
-    .in("week_start", weekStarts);
+  const [weeksResult, goalsResult] = await Promise.all([
+    admin
+      .from("weeks")
+      .select("user_id, week_start, topic")
+      .in("week_start", weekStarts),
+    admin
+      .from("goals")
+      .select("user_id, title, target_date, checkins(week_start)")
+      .is("finished_at", null)
+      .in("checkins.week_start", weekStarts)
+      .order("created_at", { ascending: true }),
+  ]);
   if (weeksResult.error) {
     return NextResponse.json(
       { error: "Could not load weeks" },
       { status: 500 },
     );
   }
+  if (goalsResult.error) {
+    return NextResponse.json(
+      { error: "Could not load goals" },
+      { status: 500 },
+    );
+  }
 
+  // A member whose data cannot be planned counts as a failure, so the run
+  // still returns 500 and shows up in cron monitoring.
+  let failed = 0;
   const nudges = planNudges({
     profiles,
     weeks: weeksResult.data.map((row) => ({
@@ -144,12 +161,21 @@ export async function GET(request: NextRequest) {
       weekStart: row.week_start,
       topic: row.topic,
     })),
+    goals: goalsResult.data.map((row) => ({
+      userId: row.user_id,
+      title: row.title,
+      targetDate: row.target_date,
+      checkinWeekStarts: row.checkins.map((checkin) => checkin.week_start),
+    })),
     now,
     siteUrl: getPublicEnv().siteUrl,
+    onError: (userId) => {
+      failed += 1;
+      console.error(`nudge: could not plan the email for member ${userId}`);
+    },
   });
 
   let sent = 0;
-  let failed = 0;
   for (const nudge of nudges) {
     if (!(await sendEmail(nudge, { apiKey, from }))) {
       failed += 1;

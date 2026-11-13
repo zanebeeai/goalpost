@@ -1,6 +1,6 @@
 # Goalpost
 
-Goalpost is a small private app for learning something new every week with a friend. On Sunday each of you picks a topic, from Monday to Thursday you keep notes on it, and on Friday you interview each other with questions the other person can't see until then. You can also each keep up to two longer goals and check in on them with one line a week.
+Goalpost is a small private app for learning something new every week with a friend. On Sunday each of you picks a topic, from Monday to Thursday you keep notes on it, and on Friday you interview each other with questions the other person can't see until then. You can also each keep up to three short-term goals, each with a target date. On Friday, a short checklist reminds you to write what stuck and check in on each goal with one line. When a goal's date passes, you decide: mark it done, extend it, or drop it.
 
 Built with Next.js, Supabase (Auth and Postgres with row-level security) and Resend for the Sunday and Friday nudge emails.
 
