@@ -1,42 +1,84 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { Brand } from "@/components/brand";
-import { Card } from "@/components/ui/card";
 
-export function AuthShell({
+export function AuthHeading({
   title,
-  description,
-  children,
+  subtitle,
 }: {
   title: string;
-  description: string;
-  children: React.ReactNode;
+  subtitle?: ReactNode;
 }) {
   return (
-    <main className="paper-grid grid min-h-screen lg:grid-cols-[.9fr_1.1fr]">
-      <section className="flex items-center justify-center px-5 py-12">
-        <div className="w-full max-w-md">
-          <Brand className="mb-10" />
-          <Card className="p-6 sm:p-8">
-            <h1 className="font-display text-3xl font-semibold tracking-tight">
-              {title}
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              {description}
-            </p>
-            <div className="mt-7">{children}</div>
-          </Card>
-        </div>
-      </section>
-      <aside className="relative hidden overflow-hidden bg-[var(--forest-950)] p-14 text-white lg:flex lg:flex-col lg:justify-end">
-        <div className="absolute -top-32 -right-32 size-[30rem] rounded-full border border-white/10" />
-        <div className="absolute -top-20 -right-20 size-[22rem] rounded-full border border-white/10" />
-        <blockquote className="font-display relative max-w-lg text-4xl leading-tight font-medium">
-          “The best time to remember why you started is while you are still
-          building.”
-        </blockquote>
-        <p className="relative mt-6 text-sm text-white/55">
-          Your ideas stay private. Your goals become a public history.
+    <>
+      <h1 className="font-display text-[2rem] leading-tight font-semibold tracking-tight wrap-anywhere text-forest-900">
+        {title}
+      </h1>
+      {subtitle ? (
+        <p className="mt-2 text-[15px] leading-relaxed wrap-anywhere text-muted">
+          {subtitle}
         </p>
-      </aside>
+      ) : null}
+    </>
+  );
+}
+
+/** Centered card for auth, onboarding and invite screens. Without a title,
+ *  the children render their own heading. */
+export function AuthShell({
+  title,
+  subtitle,
+  children,
+  footer,
+}: {
+  title?: string;
+  subtitle?: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <main
+      id="content"
+      tabIndex={-1}
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-10 sm:justify-center sm:pt-10"
+    >
+      <Link
+        href="/"
+        className="mb-10 inline-flex min-h-11 items-center self-start rounded-lg sm:mb-8"
+      >
+        <Brand />
+      </Link>
+      <div className="sm:rounded-3xl sm:border sm:border-line sm:bg-card sm:p-8 sm:shadow-[0_8px_24px_-12px_rgb(31_43_36/0.12)]">
+        {title ? (
+          <>
+            <AuthHeading title={title} subtitle={subtitle} />
+            <div className="mt-7">{children}</div>
+          </>
+        ) : (
+          children
+        )}
+      </div>
+      {footer ? (
+        <div className="mt-6 text-center text-[15px] text-muted">{footer}</div>
+      ) : null}
     </main>
+  );
+}
+
+/** A standalone text link with a 44px tap target. */
+export function AuthLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-11 items-center rounded px-1 font-semibold text-forest-700 underline underline-offset-2"
+    >
+      {children}
+    </Link>
   );
 }

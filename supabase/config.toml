@@ -3,7 +3,7 @@ project_id = "goalpost"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "graphql_public"]
+schemas = ["public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -16,18 +16,24 @@ major_version = 17
 enabled = true
 port = 54323
 
+# Local mail catcher: signup confirmation emails appear at http://127.0.0.1:54324
 [local_smtp]
 enabled = true
 port = 54324
 
 [storage]
-enabled = true
-file_size_limit = "25MiB"
+enabled = false
+
+[realtime]
+enabled = false
+
+[edge_runtime]
+enabled = false
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://127.0.0.1:3000/auth/callback"]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
 jwt_expiry = 3600
 enable_signup = true
 
@@ -38,6 +44,16 @@ enable_confirmations = true
 secure_password_change = true
 max_frequency = "1m"
 
+# Email links go to /auth/confirm (token_hash + verifyOtp) instead of the PKCE
+# code flow, so they work when opened in a different browser or device.
+[auth.email.template.confirmation]
+subject = "Confirm your Goalpost email"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Goalpost password"
+content_path = "./supabase/templates/recovery.html"
+
 [auth.external.google]
 enabled = false
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
@@ -46,10 +62,6 @@ redirect_uri = ""
 url = ""
 skip_nonce_check = false
 
-[realtime]
-enabled = true
-
-[edge_runtime]
-enabled = true
-policy = "per_worker"
-inspector_port = 8083
+# Logflare and Vector are not needed locally or in CI.
+[analytics]
+enabled = false

@@ -5,3 +5,5 @@ playwright-report
 test-results
 src/types/database.generated.ts
 supabase/.temp
+pnpm-lock.yaml
+graphify-out

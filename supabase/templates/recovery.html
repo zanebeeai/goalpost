@@ -1,0 +1,9 @@
+<h2>Reset your password</h2>
+<p>Tap the link below to choose a new Goalpost password.</p>
+<p>
+  <a
+    href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next={{ .RedirectTo }}"
+    >Reset your password</a
+  >
+</p>
+<p>If you didn't ask for this, you can ignore this email.</p>

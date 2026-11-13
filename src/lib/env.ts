@@ -1,22 +1,29 @@
-const publicEnv = {
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
-};
-
-export function isSupabaseConfigured() {
-  return Boolean(publicEnv.supabaseUrl && publicEnv.supabaseKey);
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
 }
 
-export function getPublicEnv() {
-  if (!publicEnv.supabaseUrl || !publicEnv.supabaseKey) {
-    throw new Error(
-      "Supabase is not configured. Copy .env.example to .env.local and provide NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
-    );
-  }
+export function isSupabaseConfigured(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  );
+}
+
+/**
+ * Never throws, so public pages can render without Supabase env (CI builds).
+ * Supabase values are empty strings when unconfigured; check
+ * `isSupabaseConfigured()` before creating a client.
+ */
+export function getPublicEnv(): {
+  supabaseUrl: string;
+  supabaseKey: string;
+  siteUrl: string;
+} {
   return {
-    supabaseUrl: publicEnv.supabaseUrl,
-    supabaseKey: publicEnv.supabaseKey,
-    siteUrl: publicEnv.siteUrl,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
+    siteUrl: trimTrailingSlash(
+      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    ),
   };
 }

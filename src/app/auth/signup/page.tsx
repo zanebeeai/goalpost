@@ -1,23 +1,56 @@
 import type { Metadata } from "next";
-import { signInWithGoogleAction } from "@/app/auth/actions";
-import { AuthForm } from "@/components/auth-form";
-import { AuthShell } from "@/components/auth-shell";
+import { redirect } from "next/navigation";
+import { AuthLink, AuthShell } from "@/components/auth-shell";
+import { GoogleButton, OrDivider } from "@/components/google-button";
+import { SignupCard } from "@/components/signup-card";
+import { getViewer } from "@/lib/auth";
+import { isGoogleAuthEnabled } from "@/lib/auth-providers";
+import { safeRedirectPath } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Create account",
-  robots: { index: false },
-};
+export const metadata: Metadata = { title: "Sign up" };
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const next = safeRedirectPath(
+    typeof params.next === "string" ? params.next : null,
+  );
+  if (await getViewer()) redirect(next);
+  const google = await isGoogleAuthEnabled();
+  const loginHref =
+    next === "/app"
+      ? "/auth/login"
+      : `/auth/login?next=${encodeURIComponent(next)}`;
+  const invited = next.startsWith("/join/");
+
   return (
     <AuthShell
-      title="Start your Goalpost"
-      description="Your idea lists begin private. Anything promoted to your goal tree becomes public on the open web."
+      footer={
+        <>
+          {invited ? "Already have an account? " : "Have an account? "}
+          <AuthLink href={loginHref}>Log in</AuthLink>
+        </>
+      }
     >
-      <AuthForm
-        mode="signup"
-        next="/onboarding"
-        googleAction={signInWithGoogleAction}
+      <SignupCard
+        title={invited ? "You're invited" : "Start your week"}
+        subtitle={
+          invited
+            ? "Make an account to join. It takes a minute."
+            : "Make an account. You can invite a friend once you're in."
+        }
+        next={next}
+        google={
+          google ? (
+            <>
+              <GoogleButton next={next} />
+              <OrDivider />
+            </>
+          ) : null
+        }
       />
     </AuthShell>
   );

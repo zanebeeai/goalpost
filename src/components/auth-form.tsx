@@ -1,168 +1,108 @@
 "use client";
 
-import Script from "next/script";
 import Link from "next/link";
-import { useActionState } from "react";
-import { AlertCircle, CheckCircle2, Chrome, LoaderCircle } from "lucide-react";
-import {
-  requestPasswordResetAction,
-  signInAction,
-  signUpAction,
-  updatePasswordAction,
-  type AuthState,
-} from "@/app/auth/actions";
+import { useState } from "react";
+import type { AuthState } from "@/app/auth/actions";
+import { ActionForm, FieldError, SubmitButton } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
 
 type Mode = "login" | "signup" | "reset" | "update";
 
-const actionByMode = {
-  login: signInAction,
-  signup: signUpAction,
-  reset: requestPasswordResetAction,
-  update: updatePasswordAction,
+const SUBMIT: Record<Mode, [string, string]> = {
+  login: ["Log in", "Logging in"],
+  signup: ["Create account", "Creating account"],
+  reset: ["Send reset link", "Sending"],
+  update: ["Save password", "Saving"],
 };
-
-function SubmitButton({ mode, pending }: { mode: Mode; pending: boolean }) {
-  const label = {
-    login: "Log in",
-    signup: "Create account",
-    reset: "Send reset link",
-    update: "Update password",
-  }[mode];
-  return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? <LoaderCircle className="size-4 animate-spin" /> : null}
-      {label}
-    </Button>
-  );
-}
 
 export function AuthForm({
   mode,
-  next = "/app",
-  googleAction,
+  action,
+  next,
 }: {
   mode: Mode;
+  action: (state: AuthState, formData: FormData) => Promise<AuthState>;
   next?: string;
-  googleAction?: (formData: FormData) => void | Promise<void>;
 }) {
-  const [state, action, pending] = useActionState<AuthState, FormData>(
-    actionByMode[mode],
-    {},
-  );
+  const [label, pendingLabel] = SUBMIT[mode];
+  const [sent, setSent] = useState(false);
   const needsEmail = mode !== "update";
-  const needsPassword =
-    mode === "login" || mode === "signup" || mode === "update";
-  const turnstileKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const needsPassword = mode !== "reset";
 
   return (
-    <div className="space-y-5">
-      {(mode === "login" || mode === "signup") && googleAction ? (
-        <>
-          <form action={googleAction}>
-            <input type="hidden" name="next" value={next} />
-            <Button type="submit" variant="secondary" className="w-full">
-              <Chrome className="size-4" />
-              Continue with Google
-            </Button>
-          </form>
-          <div className="flex items-center gap-3 text-xs tracking-widest text-[var(--muted)] uppercase">
-            <span className="h-px flex-1 bg-[var(--line)]" />
-            or
-            <span className="h-px flex-1 bg-[var(--line)]" />
-          </div>
-        </>
-      ) : null}
-      <form action={action} className="space-y-4">
-        <input type="hidden" name="next" value={next} />
-        {needsEmail ? (
-          <label className="block text-sm font-semibold">
-            Email
+    <>
+      <ActionForm
+        action={async (state: AuthState, formData: FormData) => {
+          const result = await action(state, formData);
+          setSent(Boolean(result.message));
+          return result;
+        }}
+        errorInline
+        className="space-y-4"
+      >
+        {next ? <input type="hidden" name="next" value={next} /> : null}
+        {needsEmail && !sent ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
             <Input
-              className="mt-1.5"
-              type="email"
+              id="email"
               name="email"
+              type="email"
               autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
               required
             />
-          </label>
+          </div>
         ) : null}
-        {needsPassword ? (
-          <label className="block text-sm font-semibold">
-            {mode === "update" ? "New password" : "Password"}
+        {needsPassword && !sent ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">
+                {mode === "update" ? "New password" : "Password"}
+              </Label>
+              {mode === "login" ? (
+                <Link
+                  href="/auth/reset"
+                  className="-my-3 inline-flex min-h-11 items-center rounded px-1 text-sm font-medium text-muted underline-offset-2 hover:text-ink hover:underline"
+                >
+                  Forgot it?
+                </Link>
+              ) : null}
+            </div>
             <Input
-              className="mt-1.5"
-              type="password"
+              id="password"
               name="password"
+              type="password"
               autoComplete={
                 mode === "login" ? "current-password" : "new-password"
               }
-              minLength={mode === "login" ? 1 : 10}
+              minLength={mode === "login" ? undefined : 8}
               required
             />
-          </label>
+            {mode === "signup" || mode === "update" ? (
+              <p className="text-sm text-muted">At least 8 characters.</p>
+            ) : null}
+          </div>
         ) : null}
-        {mode === "signup" && turnstileKey ? (
-          <>
-            <Script
-              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-              strategy="afterInteractive"
-            />
-            <div
-              className="cf-turnstile"
-              data-sitekey={turnstileKey}
-              data-theme="light"
-            />
-          </>
-        ) : null}
-        {state.error ? (
-          <p
-            role="alert"
-            className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-800"
+        <FieldError className="mt-0" />
+        {sent ? null : (
+          <SubmitButton
+            size="lg"
+            className="w-full"
+            pendingLabel={pendingLabel}
           >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            {state.error}
-          </p>
-        ) : null}
-        {state.message ? (
-          <p
-            role="status"
-            className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
-          >
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-            {state.message}
-          </p>
-        ) : null}
-        <SubmitButton mode={mode} pending={pending} />
-      </form>
-      {mode === "login" ? (
-        <div className="flex justify-between text-sm">
-          <Link
-            href="/auth/reset"
-            className="font-semibold text-[var(--forest-700)]"
-          >
-            Forgot password?
-          </Link>
-          <Link
-            href="/auth/signup"
-            className="font-semibold text-[var(--forest-700)]"
-          >
-            Create account
-          </Link>
-        </div>
+            {label}
+          </SubmitButton>
+        )}
+      </ActionForm>
+      {sent && mode === "update" ? (
+        <Button asChild size="lg" className="mt-4 w-full">
+          <Link href="/app">Go to this week</Link>
+        </Button>
       ) : null}
-      {mode === "signup" ? (
-        <p className="text-center text-sm text-[var(--muted)]">
-          Already have an account?{" "}
-          <Link
-            href="/auth/login"
-            className="font-semibold text-[var(--forest-700)]"
-          >
-            Log in
-          </Link>
-        </p>
-      ) : null}
-    </div>
+    </>
   );
 }

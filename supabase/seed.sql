@@ -1,2 +1,0 @@
--- Local development accounts are created through the app so Auth password hashing
--- and onboarding follow the same path as production. Add non-user reference data here.
