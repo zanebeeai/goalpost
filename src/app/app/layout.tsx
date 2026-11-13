@@ -1,30 +1,22 @@
-import type { Metadata } from "next";
-import { AppShell } from "@/components/app-shell";
-import { requireProfile } from "@/lib/auth";
-import { getSignedMediaUrl } from "@/lib/media";
-import { createClient } from "@/lib/supabase/server";
+import { AppNav } from "@/components/app-nav";
+import { requireMember } from "@/lib/auth";
 
-export const metadata: Metadata = {
-  title: "Workspace",
-  robots: { index: false, follow: false },
-};
-
-export default async function WorkspaceLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const profile = await requireProfile();
-  const avatarUrl = await getSignedMediaUrl(profile.avatar_path);
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", profile.id)
-    .is("read_at", null);
+  await requireMember();
   return (
-    <AppShell profile={profile} avatarUrl={avatarUrl} unread={count ?? 0}>
-      {children}
-    </AppShell>
+    <div className="min-h-dvh">
+      <AppNav />
+      <main
+        id="content"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-2xl px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 md:pt-10 md:pb-16 lg:max-w-5xl"
+      >
+        {children}
+      </main>
+    </div>
   );
 }

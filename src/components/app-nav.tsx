@@ -2,90 +2,117 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Archive,
-  Bell,
-  CalendarDays,
-  CheckCircle2,
-  LayoutList,
-  Search,
-  Sprout,
-  TreePine,
-  Users,
-} from "lucide-react";
+import { BookOpen, CalendarDays, ListPlus, Settings } from "lucide-react";
+import { Brand, BrandMark } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
-const items = [
-  { href: "/app", label: "Home", icon: Sprout, exact: true },
-  { href: "/app/ideas", label: "Ideas", icon: LayoutList },
-  { href: "/app/tree", label: "My tree", icon: TreePine },
-  { href: "/app/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/app/archive", label: "Archive", icon: Archive },
-  { href: "/app/done", label: "Done", icon: CheckCircle2 },
-  { href: "/app/inbox", label: "Inbox", icon: Bell },
-  { href: "/app/friends", label: "Friends", icon: Users },
-  { href: "/app/search", label: "Search", icon: Search },
-];
+const TABS = [
+  { href: "/app", label: "This week", icon: CalendarDays },
+  { href: "/app/next", label: "Up next", icon: ListPlus },
+  { href: "/app/history", label: "History", icon: BookOpen },
+] as const;
 
-export function AppNav({ unread = 0 }: { unread?: number }) {
-  const pathname = usePathname();
-  return (
-    <nav className="space-y-1" aria-label="Workspace">
-      {items.map(({ href, label, icon: Icon, exact }) => {
-        const active = exact ? pathname === href : pathname.startsWith(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "focus-ring flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-[var(--muted)] transition hover:bg-[var(--cream-100)] hover:text-[var(--forest-900)]",
-              active && "bg-[var(--moss-200)] text-[var(--forest-950)]",
-            )}
-          >
-            <Icon className="size-4.5" />
-            <span>{label}</span>
-            {label === "Inbox" && unread > 0 ? (
-              <span className="ml-auto rounded-full bg-[var(--clay-500)] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                {unread > 99 ? "99+" : unread}
-              </span>
-            ) : null}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+function isActive(pathname: string, href: string) {
+  return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
 }
 
-export function MobileNav({ unread = 0 }: { unread?: number }) {
+export function AppNav() {
   const pathname = usePathname();
-  const mobileItems = [items[0]!, items[1]!, items[2]!, items[3]!, items[6]!];
+  const settingsActive = pathname.startsWith("/app/settings");
+
   return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-[var(--white)]/95 px-2 pt-2 pb-[max(.5rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden"
-      aria-label="Mobile workspace"
-    >
-      {mobileItems.map((item) => {
-        const Icon = item.icon;
-        const active = item.exact
-          ? pathname === item.href
-          : pathname.startsWith(item.href);
-        return (
+    <>
+      <header className="sticky top-0 z-30 border-b border-line/70 bg-cream/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4 md:h-16 md:px-6">
           <Link
-            key={item.href}
-            href={item.href}
+            href="/app"
+            className="-mx-1 flex min-h-11 items-center gap-2 rounded-lg px-1"
+            aria-label="Goalpost, this week"
+          >
+            <BrandMark className="size-7 md:hidden" />
+            <span className="font-display text-lg font-semibold tracking-tight text-forest-900 md:hidden">
+              Goalpost
+            </span>
+            <Brand className="hidden md:inline-flex" />
+          </Link>
+
+          <nav aria-label="Main" className="hidden md:block">
+            <ul className="flex items-center gap-1">
+              {TABS.map((tab) => {
+                const active = isActive(pathname, tab.href);
+                return (
+                  <li key={tab.href}>
+                    <Link
+                      href={tab.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "inline-flex h-11 items-center rounded-full px-4 text-[15px] font-semibold transition-colors",
+                        active
+                          ? "bg-forest-900 text-cream"
+                          : "text-muted hover:bg-moss-100/60 hover:text-ink",
+                      )}
+                    >
+                      {tab.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <Link
+            href="/app/settings"
+            aria-label="Settings"
+            aria-current={settingsActive ? "page" : undefined}
             className={cn(
-              "relative flex flex-col items-center gap-1 rounded-lg py-1 text-[10px] font-semibold text-[var(--muted)]",
-              active && "text-[var(--forest-900)]",
+              "-mr-2 inline-flex size-11 items-center justify-center rounded-full transition-colors",
+              settingsActive
+                ? "bg-moss-100 text-forest-900"
+                : "text-muted hover:bg-moss-100/60 hover:text-ink",
             )}
           >
-            <Icon className="size-5" />
-            {item.label}
-            {item.label === "Inbox" && unread > 0 ? (
-              <span className="absolute top-0 right-[28%] size-2 rounded-full bg-[var(--clay-500)]" />
-            ) : null}
+            <Settings className="size-[22px]" aria-hidden />
           </Link>
-        );
-      })}
-    </nav>
+        </div>
+      </header>
+
+      <nav
+        aria-label="Main"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line/80 bg-cream/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+      >
+        <ul className="mx-auto grid max-w-md grid-cols-3">
+          {TABS.map((tab) => {
+            const active = isActive(pathname, tab.href);
+            const Icon = tab.icon;
+            return (
+              <li key={tab.href}>
+                <Link
+                  href={tab.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex h-16 flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors",
+                    active ? "text-forest-900" : "text-muted",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                      active && "bg-moss-100",
+                    )}
+                  >
+                    <Icon
+                      className="size-[20px]"
+                      strokeWidth={active ? 2.4 : 2}
+                      aria-hidden
+                    />
+                  </span>
+                  {tab.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </>
   );
 }

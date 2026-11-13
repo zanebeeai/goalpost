@@ -1,46 +1,74 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Brand } from "@/components/brand";
-import { OnboardingForm } from "@/components/onboarding-form";
-import { Card } from "@/components/ui/card";
-import { requireViewer } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { completeOnboardingAction } from "@/app/actions/space";
+import { ActionForm, FieldError, SubmitButton } from "@/components/action-form";
+import { AuthShell } from "@/components/auth-shell";
+import { joinNames } from "@/components/names";
+import { TimezoneInput } from "@/components/timezone-input";
+import { Input } from "@/components/ui/input";
+import { getMember, requireViewer } from "@/lib/auth";
+import { getInvitePreview } from "@/lib/data";
 
-export const metadata: Metadata = {
-  title: "Set up your profile",
-  robots: { index: false },
-};
+export const metadata: Metadata = { title: "Welcome" };
 
-export default async function OnboardingPage() {
-  const viewer = await requireViewer();
-  const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", viewer.id)
-    .maybeSingle();
-  if (profile) redirect("/app");
-  const suggested = viewer.email?.split("@")[0]?.replace(/[._-]+/g, " ") ?? "";
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  await requireViewer();
+  const params = await searchParams;
+  const code = typeof params.invite === "string" ? params.invite.trim() : "";
+  if (await getMember()) {
+    redirect(code ? `/join/${encodeURIComponent(code)}` : "/app");
+  }
+
+  const names = code ? await getInvitePreview(code) : null;
+  const invite = names && names.length > 0 ? code : "";
+
   return (
-    <main className="paper-grid min-h-screen px-5 py-10 sm:py-16">
-      <div className="mx-auto max-w-xl">
-        <Brand />
-        <Card className="mt-10 p-6 sm:p-9">
-          <p className="text-xs font-bold tracking-[.2em] text-[var(--clay-600)] uppercase">
-            One last step
-          </p>
-          <h1 className="font-display mt-2 text-4xl font-semibold">
-            Name your growing space.
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-            We will create a private Inbox list and reserve your public profile
-            address.
-          </p>
-          <div className="mt-8">
-            <OnboardingForm suggestedName={suggested} />
-          </div>
-        </Card>
-      </div>
-    </main>
+    <AuthShell
+      title="What should we call you?"
+      subtitle={
+        invite ? (
+          <>
+            You&apos;re joining{" "}
+            <strong className="font-semibold text-forest-900">
+              {joinNames(names ?? [])}
+            </strong>
+            .
+          </>
+        ) : code ? (
+          "That invite link is no longer valid, so you'll start your own space. You can invite a friend once you're in."
+        ) : (
+          "Your friends will see this name."
+        )
+      }
+    >
+      <ActionForm
+        action={completeOnboardingAction}
+        errorInline
+        className="space-y-4"
+      >
+        <TimezoneInput />
+        <input type="hidden" name="invite" value={invite} />
+        <label htmlFor="displayName" className="sr-only">
+          Your name
+        </label>
+        <Input
+          id="displayName"
+          name="displayName"
+          required
+          maxLength={40}
+          autoComplete="given-name"
+          autoFocus
+          placeholder="Your first name"
+        />
+        <FieldError className="mt-0" />
+        <SubmitButton size="lg" className="w-full" pendingLabel="Setting up">
+          {invite ? "Join" : "Start"}
+        </SubmitButton>
+      </ActionForm>
+    </AuthShell>
   );
 }

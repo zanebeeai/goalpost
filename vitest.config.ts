@@ -1,5 +1,5 @@
-import { defineConfig } from "vitest/config";
 import path from "node:path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
@@ -9,8 +9,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      include: ["src/lib/**/*.ts", "src/components/**/*.tsx"],
-      exclude: ["src/lib/data.ts", "src/lib/media.ts"],
+      include: ["src/lib/week.ts", "src/lib/nudge.ts", "src/lib/utils.ts"],
     },
   },
   resolve: {

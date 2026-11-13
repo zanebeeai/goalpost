@@ -1,194 +1,219 @@
-import Link from "next/link";
-import {
-  AlertTriangle,
-  ExternalLink,
-  Globe2,
-  LockKeyhole,
-  Upload,
-} from "lucide-react";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { ChevronDown, LogOut } from "lucide-react";
 import {
   deleteAccountAction,
-  updateProfileAction,
-  uploadAvatarAction,
-} from "@/app/actions/settings";
-import { PageHeader } from "@/components/page-header";
-import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+  rotateInviteAction,
+  updateSettingsAction,
+} from "@/app/actions/space";
+import { signOutAction } from "@/app/auth/actions";
+import {
+  ActionForm,
+  FieldError,
+  SavedHint,
+  SubmitButton,
+} from "@/components/action-form";
+import { TimezoneSelect } from "@/components/timezone-select";
+import { Avatar } from "@/components/avatar";
+import { CopyButton } from "@/components/copy-button";
+import { ShareButton } from "@/components/share-button";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input, Textarea } from "@/components/ui/input";
-import { requireProfile, requireViewer } from "@/lib/auth";
-import { getSignedMediaUrl } from "@/lib/media";
-import { createClient } from "@/lib/supabase/server";
+import { Input, Label } from "@/components/ui/input";
+import { requireMember } from "@/lib/auth";
+import { getMembers } from "@/lib/data";
+import { getPublicEnv } from "@/lib/env";
+
+export const metadata: Metadata = { title: "Settings" };
+
+function timezones(current: string): string[] {
+  const zones = Intl.supportedValuesOf("timeZone");
+  return zones.includes(current) ? zones : [current, ...zones];
+}
+
+function Section({
+  title,
+  children,
+  description,
+}: {
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+}) {
+  const id = `settings-${title.toLowerCase().replace(/\W+/g, "-")}`;
+  return (
+    <section
+      aria-labelledby={id}
+      className="rounded-3xl border border-line bg-card p-5 sm:p-6"
+    >
+      <h2
+        id={id}
+        className="font-display text-xl font-semibold text-forest-900"
+      >
+        {title}
+      </h2>
+      {description ? (
+        <p className="mt-1 text-[15px] leading-relaxed text-muted">
+          {description}
+        </p>
+      ) : null}
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
 
 export default async function SettingsPage() {
-  const [profile, viewer] = await Promise.all([
-    requireProfile(),
-    requireViewer(),
-  ]);
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("profiles")
-    .select("bio,email_reminders_enabled")
-    .eq("id", profile.id)
-    .single();
-  const avatarUrl = await getSignedMediaUrl(profile.avatar_path);
+  const member = await requireMember();
+  const members = await getMembers();
+  const inviteUrl = `${getPublicEnv().siteUrl}/join/${member.space.inviteCode}`;
+
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Account and privacy"
-        title="Settings"
-        description="Your profile and goal content are public. Account credentials, ideas, reminders, and notifications remain private."
-        actions={
-          <Button asChild variant="secondary">
-            <Link href={`/u/${profile.username}`}>
-              View profile <ExternalLink className="size-4" />
-            </Link>
-          </Button>
-        }
-      />
-      <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
-        <div className="space-y-6">
-          <Card className="p-6">
-            <h2 className="font-display text-2xl font-semibold">
-              Public profile
-            </h2>
-            <div className="mt-6 flex flex-col gap-6 sm:flex-row">
-              <div>
-                <Avatar
-                  name={profile.display_name}
-                  src={avatarUrl}
-                  className="size-24 text-xl"
-                />
-                <form action={uploadAvatarAction} className="mt-3 space-y-2">
-                  <Input
-                    type="file"
-                    name="avatar"
-                    accept="image/jpeg,image/png,image/webp"
-                    required
-                    className="max-w-64 text-xs"
-                  />
-                  <Button type="submit" variant="secondary" size="sm">
-                    <Upload className="size-3.5" />
-                    Upload avatar
-                  </Button>
-                </form>
-              </div>
-              <form action={updateProfileAction} className="flex-1 space-y-4">
-                <label className="block text-sm font-semibold">
-                  Display name
-                  <Input
-                    name="displayName"
-                    className="mt-1.5"
-                    defaultValue={profile.display_name}
-                    maxLength={80}
-                    required
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Username
-                  <Input
-                    className="mt-1.5"
-                    value={profile.username}
-                    readOnly
-                    disabled
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Bio
-                  <Textarea
-                    name="bio"
-                    className="mt-1.5"
-                    defaultValue={data?.bio ?? ""}
-                    maxLength={500}
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Timezone
-                  <Input
-                    name="timezone"
-                    className="mt-1.5"
-                    defaultValue={profile.timezone}
-                    required
-                  />
-                </label>
-                <label className="flex items-center gap-3 rounded-xl border p-3 text-sm">
-                  <input
-                    type="checkbox"
-                    name="emailReminders"
-                    defaultChecked={data?.email_reminders_enabled ?? true}
-                    className="size-4 accent-[var(--forest-800)]"
-                  />
-                  Send email for scheduled reminders
-                </label>
-                <Button type="submit">Save profile</Button>
-              </form>
-            </div>
-          </Card>
-          <Card className="border-red-200 p-6">
-            <h2 className="font-display text-2xl font-semibold text-red-900">
-              Delete account
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-              Shared lists and goals transfer to the longest-standing eligible
-              collaborator. Sole-owned work is deleted, and retained shared
-              contributions become attributed to “Deleted user.” Backups expire
-              within 30 days.
-            </p>
-            <form
-              action={deleteAccountAction}
-              className="mt-5 flex flex-col gap-3 sm:flex-row"
-            >
+    <div className="mx-auto max-w-2xl">
+      <header className="mb-6">
+        <h1 className="font-display text-[1.75rem] leading-tight font-semibold tracking-tight text-forest-900 sm:text-4xl">
+          Settings
+        </h1>
+        {member.email ? (
+          <p className="mt-1 text-[15px] break-all text-muted">
+            {member.email}
+          </p>
+        ) : null}
+      </header>
+
+      <div className="space-y-4">
+        <Section title="You">
+          <ActionForm
+            action={updateSettingsAction}
+            errorInline
+            className="space-y-5"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="displayName">Name</Label>
               <Input
-                name="confirmation"
-                placeholder="Type DELETE MY ACCOUNT"
-                pattern="DELETE MY ACCOUNT"
+                id="displayName"
+                name="displayName"
+                defaultValue={member.displayName}
                 required
+                maxLength={40}
+                autoComplete="given-name"
               />
-              <Button type="submit" variant="danger">
-                Delete permanently
-              </Button>
-            </form>
-          </Card>
-        </div>
-        <aside className="space-y-4">
-          <Card className="p-5">
-            <Globe2 className="size-5 text-[var(--clay-600)]" />
-            <h2 className="font-display mt-3 text-xl font-semibold">
-              Always public
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              Your name, username, avatar, bio, goal tree, goal details,
-              collaborators, public comments, and goal attachments.
-            </p>
-          </Card>
-          <Card className="p-5">
-            <LockKeyhole className="size-5 text-[var(--forest-700)]" />
-            <h2 className="font-display mt-3 text-xl font-semibold">
-              Always private
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              Your email ({viewer.email}), idea lists, reminder settings,
-              notifications, blocks, and reports.
-            </p>
-          </Card>
-          <div className="flex gap-2 rounded-xl border border-[var(--clay-200)] bg-orange-50 p-4 text-xs leading-5 text-[var(--clay-600)]">
-            <AlertTriangle className="size-4 shrink-0" />
-            Blocking prevents interaction but cannot hide a public profile or
-            goal from anonymous visitors.
+              <FieldError className="mt-1" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="timezone">Timezone</Label>
+              <TimezoneSelect
+                zones={timezones(member.space.timezone)}
+                value={member.space.timezone}
+              />
+              <p className="text-sm text-muted">
+                Shared by your space. It decides when Sunday and Friday start.
+              </p>
+            </div>
+            <label className="flex min-h-11 cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                name="emailNudges"
+                defaultChecked={member.emailNudges}
+                className="size-5 shrink-0 cursor-pointer rounded accent-forest-900"
+              />
+              <span className="text-[16px] text-ink">
+                Email me on Sunday and Friday
+              </span>
+            </label>
+            <div className="flex items-center gap-3">
+              <SubmitButton pendingLabel="Saving">Save</SubmitButton>
+              <SavedHint />
+            </div>
+          </ActionForm>
+        </Section>
+
+        <Section title="Your space">
+          <ul className="space-y-2">
+            {members.map((person) => (
+              <li key={person.id} className="flex items-center gap-3">
+                <Avatar name={person.displayName} me={person.isMe} />
+                <span className="min-w-0 font-semibold wrap-anywhere text-ink">
+                  {person.displayName}
+                  {person.isMe ? (
+                    <span className="font-normal text-muted"> (you)</span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section
+          title="Invite link"
+          description="Anyone with this link can join your space."
+        >
+          <p className="truncate rounded-xl border border-line bg-white/70 px-3.5 py-3 font-mono text-sm text-muted">
+            {inviteUrl}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <CopyButton value={inviteUrl} />
+            <ShareButton
+              label="Share"
+              text="Join me on Goalpost. We each pick something to learn on Sunday and interview each other on Friday."
+              url={inviteUrl}
+            />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge>
-              <Link href="/legal/privacy">Privacy</Link>
-            </Badge>
-            <Badge>
-              <Link href="/legal/terms">Terms</Link>
-            </Badge>
-            <Badge>
-              <Link href="/legal/community">Community</Link>
-            </Badge>
-          </div>
-        </aside>
+          <ActionForm
+            action={rotateInviteAction}
+            className="mt-5 border-t border-line pt-4"
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <SubmitButton variant="secondary" pendingLabel="Resetting">
+                Reset link
+              </SubmitButton>
+              <SavedHint>New link ready</SavedHint>
+            </div>
+            <p className="mt-2 text-sm text-muted">
+              The old link stops working.
+            </p>
+          </ActionForm>
+        </Section>
+
+        <Section title="Account">
+          <form action={signOutAction}>
+            <Button type="submit" variant="secondary">
+              <LogOut aria-hidden />
+              Sign out
+            </Button>
+          </form>
+
+          <details className="group mt-6 border-t border-line pt-2">
+            <summary className="-mx-2 flex min-h-11 items-center justify-between rounded-lg px-2 text-sm font-semibold text-clay-ink hover:bg-clay/10">
+              Delete account
+              <ChevronDown
+                aria-hidden
+                className="size-4 transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <ActionForm action={deleteAccountAction} className="mt-2 space-y-3">
+              <p className="text-[15px] leading-relaxed text-ink">
+                This removes your account and everything you wrote. It
+                can&apos;t be undone.
+              </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-delete">
+                  Type <span className="font-mono">delete</span> to confirm
+                </Label>
+                <Input
+                  id="confirm-delete"
+                  name="confirm"
+                  required
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  pattern="[Dd][Ee][Ll][Ee][Tt][Ee]"
+                />
+              </div>
+              <SubmitButton variant="danger" pendingLabel="Deleting">
+                Delete my account
+              </SubmitButton>
+            </ActionForm>
+          </details>
+        </Section>
       </div>
     </div>
   );

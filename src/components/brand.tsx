@@ -1,30 +1,34 @@
-import Link from "next/link";
-import { Sprout } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function Brand({
-  compact = false,
-  className,
-}: {
-  compact?: boolean;
-  className?: string;
-}) {
+/** The goalpost mark: crossbar, two uprights and a post. */
+export function BrandMark({ className }: { className?: string }) {
   return (
-    <Link
-      href="/"
-      className={cn(
-        "focus-ring inline-flex items-center gap-2 rounded-lg",
-        className,
-      )}
+    <svg
+      viewBox="0 0 32 32"
+      aria-hidden
+      className={cn("size-8 shrink-0", className)}
     >
-      <span className="flex size-9 items-center justify-center rounded-full bg-[var(--forest-900)] text-white">
-        <Sprout className="size-5" aria-hidden />
+      <rect width="32" height="32" rx="9" fill="var(--forest-900)" />
+      <path
+        d="M9.5 7.5v9.5h13V7.5M16 17v8"
+        fill="none"
+        stroke="var(--cream)"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="16" cy="11" r="2.2" fill="var(--clay)" />
+    </svg>
+  );
+}
+
+export function Brand({ className }: { className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-2.5", className)}>
+      <BrandMark />
+      <span className="font-display text-xl font-semibold tracking-tight text-forest-900">
+        Goalpost
       </span>
-      {!compact ? (
-        <span className="font-display text-xl font-semibold tracking-tight">
-          Goalpost
-        </span>
-      ) : null}
-    </Link>
+    </span>
   );
 }

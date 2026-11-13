@@ -21,12 +21,8 @@
 *.pem
 *.tsbuildinfo
 .vercel
-.sentryclirc
 supabase/.branches
 supabase/.temp
-
-# local backup output
-/backups
 
 # Graphify local state
 /graphify-out/.graphify_python
